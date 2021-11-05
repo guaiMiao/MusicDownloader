@@ -1,5 +1,5 @@
 # MusicDownloader
-
+支持网易云音乐、酷我音乐、酷狗音乐单曲下载、歌单下载
 ## 音乐下载
 ### 可识别的音乐地址
 网易云音乐歌单：https://y.music.163.com/m/playlist?id=5355761709<br>
