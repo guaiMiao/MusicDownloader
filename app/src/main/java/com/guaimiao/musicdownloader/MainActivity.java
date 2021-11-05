@@ -125,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
                     builder.setNegativeButton("确定", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-                            if(which==1){
+                            if(select[0]==1){
                                 AlertDialog.Builder builder1 = new AlertDialog.Builder(MainActivity.this);
                                 builder1.setMessage("qq音乐暂未实现\n如需下载请使用音频拦截");
                                 builder1.show();

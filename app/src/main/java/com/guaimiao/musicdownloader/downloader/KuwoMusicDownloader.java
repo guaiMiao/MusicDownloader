@@ -22,42 +22,14 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 public class KuwoMusicDownloader extends MusicDownloader {
-    @Override
-    public void download() {
-        if(downloadUrl.equals("")){
-            Toast.makeText(DownloadActivity.getInstance(),"未识别歌曲",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        final int[] downloadType = {0};
-        AlertDialog.Builder builder = new AlertDialog.Builder(DownloadActivity.getInstance());
-        builder.setSingleChoiceItems(new String[]{"mp3", "aac"}, 0, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                downloadType[0] = which;
-            }
-        });
-        builder.setTitle("选择格式");
-        builder.setNeutralButton("下载", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                if(downloadType[0] == 0)
-                    download(downloadUrl,singer,name);
-                else
-                    download(aacDownloadUrl,singer,name);
-                Toast.makeText(DownloadActivity.getInstance(),"开始下载",Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.show();
-    }
-    public String aacDownloadUrl = "";
 
     @Override
     public void interceptRequest(WebResourceRequest request) {
         String url = request.getUrl().toString();
         if(url.contains("api/mobile/v2/music/src/")){
-            aacDownloadUrl = url.split("/")[url.split("/").length-1];
+            downloadUrl = url.split("/")[url.split("/").length-1];
             OkHttpClient client = new OkHttpClient();
-            Request request1 = new Request.Builder().url("http://www.kuwo.cn/webmusic/st/getMuiseByRid?rid=MUSIC_"+aacDownloadUrl).removeHeader("User-Agent").addHeader("User-Agent", getUserAgent()).build();
+            Request request1 = new Request.Builder().url("http://m.kuwo.cn/newh5app/api/mobile/v2/music/src/"+downloadUrl).removeHeader("User-Agent").addHeader("User-Agent", getUserAgent()).build();
             Call call = client.newCall(request1);
             call.enqueue(new Callback() {
                 @Override
@@ -66,19 +38,42 @@ public class KuwoMusicDownloader extends MusicDownloader {
                 }
 
                 @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    Map<String,String> xml = xmlToMap(response.body().string().replace("&","&amp;"));
-                    name = xml.get("name");
-                    singer = xml.get("singer");
-                    downloadUrl = "http://"+xml.get("mp3dl")+"/"+xml.get("mp3path").replace("//","/");
-                    aacDownloadUrl = "http://"+xml.get("aacdl")+"/"+xml.get("aacpath").replace("//","/");
-                    DownloadActivity.getInstance().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            DownloadActivity.getInstance().foundMusic(name,singer);
-                        }
-                    });
+                public void onResponse(Call call, Response response) {
+                    try {
+                        Gson g = new Gson();
+                        LinkedTreeMap<String,LinkedTreeMap<String,String>> l = g.fromJson(response.body().string(),LinkedTreeMap.class);
+                        downloadUrl = l.get("data").get("url");
+                        DownloadActivity.getInstance().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                DownloadActivity.getInstance().foundMusic(name, singer);
+                            }
+                        });
+                    }catch (Exception e){e.printStackTrace();}
+                }
+            });
+            Request request2 = new Request.Builder().url("http://m.kuwo.cn/newh5app/api/mobile/v1/music/info/"+downloadUrl).removeHeader("User-Agent").addHeader("User-Agent", getUserAgent()).build();
+            Call call1 = client.newCall(request2);
+            call1.enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
 
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) {
+                    try {
+                        Gson g = new Gson();
+                        LinkedTreeMap<String,LinkedTreeMap<String,LinkedTreeMap<String,Object>>> l = g.fromJson(response.body().string(),LinkedTreeMap.class);
+                        name = (String) l.get("data").get("info").get("name");
+                        singer = (String) l.get("data").get("info").get("artist_name");
+                        DownloadActivity.getInstance().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                DownloadActivity.getInstance().foundMusic(name, singer);
+                            }
+                        });
+                    }catch (Exception e){e.printStackTrace();}
                 }
             });
         }
@@ -130,12 +125,11 @@ public class KuwoMusicDownloader extends MusicDownloader {
                                                     });
                                                     ArrayList<LinkedTreeMap<String,Object>> l = (ArrayList<LinkedTreeMap<String, Object>>) t2.get("musicList");
                                                     urlList.clear();
-                                                    aacUrlList.clear();
                                                     fileNameList.clear();
                                                     for(int i = 0;i<l.size();i++){
-
+                                                        fileNameList.add(l.get(i).get("name")+" - "+l.get(i).get("artist_name"));
                                                         OkHttpClient client = new OkHttpClient();
-                                                        Request request1 = new Request.Builder().url("http://www.kuwo.cn/webmusic/st/getMuiseByRid?rid=MUSIC_"+((int)(double)l.get(i).get("id"))).removeHeader("User-Agent").addHeader("User-Agent", getUserAgent()).build();
+                                                        Request request1 = new Request.Builder().url("http://m.kuwo.cn/newh5app/api/mobile/v1/music/info/"+((int)(double)l.get(i).get("id"))).removeHeader("User-Agent").addHeader("User-Agent", getUserAgent()).build();
                                                         Call call = client.newCall(request1);
                                                         call.enqueue(new Callback() {
                                                             @Override
@@ -146,10 +140,9 @@ public class KuwoMusicDownloader extends MusicDownloader {
                                                             @Override
                                                             public void onResponse(Call call, Response response1) {
                                                                 try {
-                                                                    Map<String, String> xml = xmlToMap(response1.body().string().replace("&", "&amp;"));
-                                                                    fileNameList.add(xml.get("name") + " - " + xml.get("singer"));
-                                                                    urlList.add("http://" + xml.get("mp3dl") + "/" + xml.get("mp3path").replace("//", "/"));
-                                                                    aacUrlList.add("http://" + xml.get("aacdl") + "/" + xml.get("aacpath").replace("//", "/"));
+                                                                    Gson g = new Gson();
+                                                                    LinkedTreeMap<String,LinkedTreeMap<String,String>> l = g.fromJson(response.body().string(),LinkedTreeMap.class);
+                                                                    urlList.add(l.get("data").get("url"));
                                                                 }catch (Exception e){
                                                                     e.printStackTrace();
                                                                 }
@@ -180,30 +173,11 @@ public class KuwoMusicDownloader extends MusicDownloader {
 
     ArrayList<String> urlList = new ArrayList<String>();
     ArrayList<String> fileNameList = new ArrayList<String>();
-    ArrayList<String> aacUrlList = new ArrayList<String>();
     String listName;
 
     @Override
     public void downloadList() {
-        final int[] downloadType = {0};
-        AlertDialog.Builder builder = new AlertDialog.Builder(DownloadActivity.getInstance());
-        builder.setSingleChoiceItems(new String[]{"mp3", "aac"}, 0, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                downloadType[0] = which;
-            }
-        });
-        builder.setTitle("选择格式");
-        builder.setNeutralButton("下载", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                if(downloadType[0] == 0)
-                    downloadList(urlList,fileNameList,listName);
-                else
-                    downloadList(aacUrlList,fileNameList,listName);
-                Toast.makeText(DownloadActivity.getInstance(),"开始下载"+fileNameList.size()+"首歌",Toast.LENGTH_SHORT).show();
-            }
-        });
-        builder.show();
+        downloadList(urlList,fileNameList,listName);
+        Toast.makeText(DownloadActivity.getInstance(),"开始下载"+fileNameList.size()+"首歌",Toast.LENGTH_SHORT).show();
     }
 }
